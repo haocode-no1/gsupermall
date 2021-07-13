@@ -1,19 +1,23 @@
 <template>
   <div id="home">
     <nav-bar class="home-nav"><div slot="center">购物街</div></nav-bar>
-    
+    <tab-control :titles="['流行', '新款', '精选']"
+                 @tabClick="tabClick"
+                 ref="tabControl1"
+                 class="tab-control"
+                 v-show="isTabFixed"/>
     <scroll class="content" 
             ref="scroll" 
             :probe-type="3" 
             @scroll="contentScroll"
             :pull-up-load="true"
             @pullingUp="loadMore">
-      <home-swiper :banners="banners"/>
+      <home-swiper :banners="banners" @SwiperImageLoad="SwiperImageLoad"/>
       <recommend-view :recommends="recommends"/>
       <feature-view/>
-      <tab-control class="tab-control" 
-                  :titles="['流行', '新款', '精选']"
-                  @tabClick="tabClick"/>
+      <tab-control :titles="['流行', '新款', '精选']"
+                   @tabClick="tabClick"
+                   ref="tabControl2"/>
       <goods-list :goods="showGoods"/>
     </scroll>
     <!-- 监听组件的原生事件增加.native -->
@@ -36,6 +40,7 @@
   import {getHomeMultidata,
           getHomeGoods
           } from 'network/home'
+  import {debounce} from 'common/utils'
 
   
 
@@ -63,13 +68,26 @@
           'sell': {page: 0, list: []}
         },
         currentType: 'pop',
-        isShowBackTop: false
+        isShowBackTop: false,
+        tabOffsetTop: 0,
+        isTabFixed: false,
+        saveY: 0
       }
     },
     computed: {
       showGoods(){
         return this.goods[this.currentType].list
       }
+    },
+    destroyed(){
+      console.log('home destroyed');
+    },
+    activated(){
+      this.$refs.scroll.refresh()
+      this.$refs.scroll.scrollTo(0, this.saveY, 0)      
+    },
+    deactivated(){      
+      this.saveY = this.$refs.scroll.getScrollY()      
     },
     created(){
       //1.请求多个数据
@@ -78,15 +96,24 @@
       this.getHomeGoods('pop') 
       this.getHomeGoods('new')
       this.getHomeGoods('sell')     
+      
+      
     },
-    mounted(){
+    mounted(){      
+      //1.监听item中图片加载完成,接收事件总线
+      const refresh = debounce(this.$refs.scroll.refresh, 50)      
+      this.$bus.$on('itemImageLoad', () => {        
+        refresh()        
+      })
 
+      
     },
     methods: {
       
       /* 
         事件监听相关的方法
       */      
+      
       tabClick(index){
         switch(index){
           case 0:
@@ -99,18 +126,28 @@
             this.currentType = 'sell'
             break  
         }
+        this.$refs.tabControl1.currentIndex = index;
+        this.$refs.tabControl2.currentIndex = index;
       },
       backClick(){
         this.$refs.scroll.scrollTo(0, 0)
       },
       contentScroll(position){
+        //1.判断BackTop是否显示
         this.isShowBackTop = (-position.y) > 1000
+
+        //2.决定tabControl是否吸顶(position: fixed)
+        this.isTabFixed = (-position.y) > this.tabOffsetTop
+
       },
       loadMore(){
         this.getHomeGoods(this.currentType)
-        
+      },      
+      SwiperImageLoad(){        
+        //2.获取tabControl的tabOffsetTop    
+        //所有组件都有一个属性$el: 用于获取组件中的元素
+        this.tabOffsetTop = this.$refs.tabControl2.$el.offsetTop   
       },
-
       /* 
         网络请求相关的方法
       */
@@ -130,7 +167,8 @@
           this.goods[type].list.push(...res.data.list)
           this.goods[type].page += 1
 
-          this.$refs.scroll.finishPullUp()
+          //完成加载更多
+          this.$refs.scroll.finshPullUp()
         })
       }      
     }
@@ -138,26 +176,27 @@
 </script>
 <style scoped>
   #home {
-    padding-top: 44px;
+    /* padding-top: 44px; */
     /* vh -> viewport hegiht */
     height: 100vh;
+    position: relative;
   }
   .home-nav {
     background-color: var(--color-tint);
     color: #fff;
     /* 停留效果
+    浏览器原生滚动使用
     位置定位: 滑动固定头部导航栏 */
-    position: fixed;
+    /* position: fixed;
     left: 0px;
     right: 0px;
     top: 0px;
-    z-index: 9;
+    z-index: 9; */
   }
-  /* 停留效果 */
+
   .tab-control {
-    position: sticky;
-    top: 0px;
     position: relative;
+    z-index: 9;
   }
 
   .content {
@@ -169,6 +208,8 @@
     left: 0px;
     right: 0px;
   }
+
+  
 
   /* .content {
     height: calc(100% - 49px);     
