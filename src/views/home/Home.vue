@@ -34,13 +34,13 @@
   import Scroll from 'components/common/scroll/Scroll'
   import TabControl from 'components/content/tabControl/TabControl'
   import GoodsList from 'components/content/goods/GoodsList'
-  import BackTop from 'components/content/backTop/BackTop'
   
-
+  
+  import {POP, NEW, SELL} from 'common/const'
   import {getHomeMultidata,
           getHomeGoods
           } from 'network/home'
-  import {itemListenerMixin} from 'common/mixin.js';
+  import {itemListenerMixin, backTopMixin} from 'common/mixin.js';
   
 
   export default {
@@ -54,9 +54,9 @@
       getHomeGoods,
       GoodsList,
       Scroll,
-      BackTop
+      
     },
-    mixins: [itemListenerMixin],
+    mixins: [itemListenerMixin, backTopMixin],
     data(){
       return {
         // result: null
@@ -67,8 +67,8 @@
           'new': {page: 0, list: []},
           'sell': {page: 0, list: []}
         },
-        currentType: 'pop',
-        isShowBackTop: false,
+        currentType: POP,
+        
         tabOffsetTop: 0,
         isTabFixed: false,
         saveY: 0
@@ -96,9 +96,9 @@
       //1.请求多个数据
       this.getHomeMultidata()
       //2.请求商品数据
-      this.getHomeGoods('pop') 
-      this.getHomeGoods('new')
-      this.getHomeGoods('sell')     
+      this.getHomeGoods(POP) 
+      this.getHomeGoods(NEW)
+      this.getHomeGoods(SELL)     
       
       
     },
@@ -113,24 +113,22 @@
       tabClick(index){
         switch(index){
           case 0:
-            this.currentType = 'pop'
+            this.currentType = POP
             break
           case 1:
-            this.currentType = 'new'
+            this.currentType = NEW
             break
           case 2:
-            this.currentType = 'sell'
+            this.currentType = SELL
             break  
         }
         this.$refs.tabControl1.currentIndex = index;
         this.$refs.tabControl2.currentIndex = index;
       },
-      backClick(){
-        this.$refs.scroll.scrollTo(0, 0)
-      },
+      
       contentScroll(position){
         //1.判断BackTop是否显示
-        this.isShowBackTop = (-position.y) > 1000
+        this.listenShowBackTop(position)
 
         //2.决定tabControl是否吸顶(position: fixed)
         this.isTabFixed = (-position.y) > this.tabOffsetTop
